@@ -19,7 +19,10 @@ export function useObjectsSocket({
   onCreated,
   onDeleted,
 }: UseObjectsSocketOptions): boolean {
-  const [connected, setConnected] = useState(() => getSocket().connected);
+  // Always start `false` so the first client render matches the server-rendered
+  // HTML (no socket exists during SSR) — the effect below syncs it to the
+  // socket's actual state right after mount instead of during render.
+  const [connected, setConnected] = useState(false);
   const onCreatedRef = useRef(onCreated);
   const onDeletedRef = useRef(onDeleted);
 
@@ -43,6 +46,12 @@ export function useObjectsSocket({
     socket.on("disconnect", handleDisconnect);
     socket.on("object:created", handleCreated);
     socket.on("object:deleted", handleDeleted);
+
+    // The socket may have already connected before this effect ran (e.g. a
+    // singleton reused from a prior mount) — sync the real state now.
+    if (socket.connected) {
+      handleConnect();
+    }
 
     return () => {
       socket.off("connect", handleConnect);
