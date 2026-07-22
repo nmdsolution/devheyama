@@ -19,6 +19,12 @@ build/
 # turborepo (not used in this repo, kept as a safety net per project convention)
 .turbo/
 
+# local orchestrator tooling - not part of the delivered app
+.claude/
+.mcp.json
+CLAUDE.md
+todo-ExamendeDEVHeyama.txt
+
 # misc
 .DS_Store
 *.log
