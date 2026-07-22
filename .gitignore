@@ -1,0 +1,24 @@
+# Applies repo-wide; api/ has no .gitignore of its own (scaffolded with --skip-git),
+# web/ already has a Next.js-generated .gitignore but these patterns are kept here too
+# as a safety net.
+
+# dependencies
+node_modules/
+
+# env files - never commit real secrets, only .env.example files
+.env
+.env.local
+.env.*.local
+
+# build output
+dist/
+.next/
+out/
+build/
+
+# turborepo (not used in this repo, kept as a safety net per project convention)
+.turbo/
+
+# misc
+.DS_Store
+*.log
