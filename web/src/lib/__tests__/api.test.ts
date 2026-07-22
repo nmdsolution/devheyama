@@ -94,4 +94,91 @@ describe("fetchObjects", () => {
 
     expect(result.hasMore).toBe(false);
   });
+
+  describe("error message parsing on a failed response", () => {
+    it("joins and capitalizes a class-validator array message", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        json: async () => ({
+          message: ["description must be longer than or equal to 10 characters"],
+          error: "Bad Request",
+          statusCode: 400,
+        }),
+      }) as unknown as typeof fetch;
+
+      await expect(fetchObjects()).rejects.toThrow(
+        "Description must be longer than or equal to 10 characters"
+      );
+    });
+
+    it("joins multiple array messages with '; ' and capitalizes each", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        json: async () => ({
+          message: ["title should not be empty", "description must be longer than or equal to 10 characters"],
+        }),
+      }) as unknown as typeof fetch;
+
+      await expect(fetchObjects()).rejects.toThrow(
+        "Title should not be empty; Description must be longer than or equal to 10 characters"
+      );
+    });
+
+    it("uses a plain string message directly", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        json: async () => ({ message: "Object not found", error: "Not Found", statusCode: 404 }),
+      }) as unknown as typeof fetch;
+
+      await expect(fetchObjects()).rejects.toThrow("Object not found");
+    });
+
+    it("falls back to the status text when the body is valid JSON but has no message field (e.g. an unrelated proxy error shape)", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 504,
+        statusText: "Gateway Timeout",
+        json: async () => ({ error: "Gateway Timeout", statusCode: 504 }),
+      }) as unknown as typeof fetch;
+
+      await expect(fetchObjects()).rejects.toThrow(
+        "Request failed with status 504 Gateway Timeout"
+      );
+    });
+
+    it("falls back to the status text when the body is an empty JSON object", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: async () => ({}),
+      }) as unknown as typeof fetch;
+
+      await expect(fetchObjects()).rejects.toThrow(
+        "Request failed with status 500 Internal Server Error"
+      );
+    });
+
+    it("falls back to the status text when the body has no usable message", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: async () => {
+          throw new Error("not json");
+        },
+        text: async () => "",
+      }) as unknown as typeof fetch;
+
+      await expect(fetchObjects()).rejects.toThrow(
+        "Request failed with status 500 Internal Server Error"
+      );
+    });
+  });
 });
