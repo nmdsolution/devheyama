@@ -20,9 +20,40 @@ export function resolveImageUrl(imageUrl: string): string {
   return `${API_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
 }
 
+function capitalize(text: string): string {
+  return text.length > 0 ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+/**
+ * class-validator's default error shape is `{ message: string | string[], error, statusCode }`.
+ * `message` is a string array when multiple validation rules fail, or a plain
+ * string for other errors (e.g. thrown HttpExceptions). Turn either shape into
+ * a single readable sentence for display in the UI.
+ */
+function extractErrorMessage(body: unknown): string | null {
+  if (!body || typeof body !== "object" || !("message" in body)) return null;
+
+  const { message } = body as { message: unknown };
+  if (Array.isArray(message)) {
+    const messages = message.filter((entry): entry is string => typeof entry === "string");
+    if (messages.length === 0) return null;
+    return messages.map((entry) => capitalize(entry)).join("; ");
+  }
+  if (typeof message === "string" && message.length > 0) {
+    return message;
+  }
+  return null;
+}
+
 async function throwIfNotOk(res: Response): Promise<void> {
   if (!res.ok) {
-    const message = await res.text().catch(() => "");
+    let message: string | null = null;
+    try {
+      const body = await res.json();
+      message = extractErrorMessage(body);
+    } catch {
+      message = (await res.text().catch(() => "")) || null;
+    }
     throw new Error(
       message || `Request failed with status ${res.status} ${res.statusText}`
     );

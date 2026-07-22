@@ -16,8 +16,13 @@ function makeImageFile(name = "photo.png") {
 }
 
 describe("NewObjectPage", () => {
+  const mockCreateObjectUrl = jest.fn(() => "blob:mock-object-url");
+  const mockRevokeObjectUrl = jest.fn();
+
   beforeEach(() => {
     jest.clearAllMocks();
+    global.URL.createObjectURL = mockCreateObjectUrl;
+    global.URL.revokeObjectURL = mockRevokeObjectUrl;
   });
 
   it("keeps the Create button disabled until title, description, and an image are all provided", async () => {
@@ -97,6 +102,47 @@ describe("NewObjectPage", () => {
     fireEvent.click(submitButton);
 
     expect(await screen.findByText("Upload failed")).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("shows an image preview thumbnail after a file is selected", async () => {
+    render(<NewObjectPage />);
+
+    const fileInput = document.getElementById("image") as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [makeImageFile()] } });
+
+    const preview = await screen.findByAltText("photo.png");
+    expect(preview.tagName).toBe("IMG");
+    expect(preview).toHaveAttribute("src", "blob:mock-object-url");
+    expect(mockCreateObjectUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a readable, capitalized error message when the API rejects with a class-validator style array message", async () => {
+    // This mirrors what throwIfNotOk produces for a class-validator response
+    // like { message: ["description must be longer than or equal to 10 characters"] }.
+    mockedCreateObject.mockRejectedValueOnce(
+      new Error("Description must be longer than or equal to 10 characters")
+    );
+
+    render(<NewObjectPage />);
+
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: "Vintage Camera" },
+    });
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "short" },
+    });
+    const fileInput = document.getElementById("image") as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [makeImageFile()] } });
+
+    const submitButton = await screen.findByRole("button", { name: /create object/i });
+    await waitFor(() => expect(submitButton).toBeEnabled());
+    fireEvent.click(submitButton);
+
+    const alert = await screen.findByText(
+      "Description must be longer than or equal to 10 characters"
+    );
+    expect(alert).toHaveClass("border-destructive/30", "bg-destructive/10");
     expect(mockPush).not.toHaveBeenCalled();
   });
 });
