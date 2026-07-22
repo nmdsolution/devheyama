@@ -13,13 +13,20 @@ export default function ObjectsListPage() {
   const [objects, setObjects] = useState<ApiObject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    fetchObjects()
-      .then((data) => {
-        if (!cancelled) setObjects(data);
+    fetchObjects({ page: 1 })
+      .then((result) => {
+        if (!cancelled) {
+          setObjects(result.items);
+          setPage(result.page);
+          setHasMore(result.hasMore);
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -34,6 +41,22 @@ export default function ObjectsListPage() {
       cancelled = true;
     };
   }, []);
+
+  const handleLoadMore = () => {
+    setIsLoadingMore(true);
+    fetchObjects({ page: page + 1 })
+      .then((result) => {
+        setObjects((current) => [...current, ...result.items]);
+        setPage(result.page);
+        setHasMore(result.hasMore);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Failed to load objects.");
+      })
+      .finally(() => {
+        setIsLoadingMore(false);
+      });
+  };
 
   const isConnected = useObjectsSocket({
     onCreated: (object) => {
@@ -78,30 +101,44 @@ export default function ObjectsListPage() {
             No objects yet. Create your first one.
           </p>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-            {objects.map((object) => (
-              <Link
-                key={object._id}
-                href={`/objects/${object._id}`}
-                className="group overflow-hidden rounded-xl border bg-card ring-1 ring-foreground/10 transition-colors hover:ring-foreground/20"
-              >
-                <ObjectImage
-                  src={resolveImageUrl(object.imageUrl)}
-                  alt={object.title}
-                  className="aspect-4/3 w-full"
-                />
-                <div className="p-3.5">
-                  <p className="mb-1 text-sm font-semibold">{object.title}</p>
-                  <p className="mb-2 line-clamp-2 text-xs text-muted-foreground">
-                    {object.description}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Added {formatRelativeTime(object.createdAt)}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+              {objects.map((object) => (
+                <Link
+                  key={object._id}
+                  href={`/objects/${object._id}`}
+                  className="group overflow-hidden rounded-xl border bg-card ring-1 ring-foreground/10 transition-colors hover:ring-foreground/20"
+                >
+                  <ObjectImage
+                    src={resolveImageUrl(object.imageUrl)}
+                    alt={object.title}
+                    className="aspect-4/3 w-full"
+                  />
+                  <div className="p-3.5">
+                    <p className="mb-1 text-sm font-semibold">{object.title}</p>
+                    <p className="mb-2 line-clamp-2 text-xs text-muted-foreground">
+                      {object.description}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Added {formatRelativeTime(object.createdAt)}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {hasMore && (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                >
+                  {isLoadingMore ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

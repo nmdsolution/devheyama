@@ -5,12 +5,14 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ObjectsService } from './objects.service';
 import { CreateObjectDto } from './dto/create-object.dto';
+import { FindObjectsQueryDto } from './dto/find-objects-query.dto';
 
 @Controller('objects')
 export class ObjectsController {
@@ -26,8 +28,8 @@ export class ObjectsController {
   }
 
   @Get()
-  findAll() {
-    return this.objectsService.findAll();
+  findAll(@Query() query: FindObjectsQueryDto) {
+    return this.objectsService.findAll(query);
   }
 
   @Get(':id')
