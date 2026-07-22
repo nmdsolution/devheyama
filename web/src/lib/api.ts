@@ -29,10 +29,39 @@ async function throwIfNotOk(res: Response): Promise<void> {
   }
 }
 
-export async function fetchObjects(): Promise<ApiObject[]> {
-  const res = await fetch(`${API_URL}/objects`, { cache: "no-store" });
+export interface FetchObjectsParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface FetchObjectsResult {
+  items: ApiObject[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+export async function fetchObjects(
+  params: FetchObjectsParams = {}
+): Promise<FetchObjectsResult> {
+  const searchParams = new URLSearchParams();
+  if (params.page !== undefined) searchParams.set("page", String(params.page));
+  if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
+
+  const query = searchParams.toString();
+  const res = await fetch(`${API_URL}/objects${query ? `?${query}` : ""}`, {
+    cache: "no-store",
+  });
   await throwIfNotOk(res);
-  return res.json();
+  const { items, total, page, limit } = (await res.json()) as {
+    items: ApiObject[];
+    total: number;
+    page: number;
+    limit: number;
+  };
+
+  return { items, total, page, limit, hasMore: page * limit < total };
 }
 
 export async function fetchObject(id: string): Promise<ApiObject> {

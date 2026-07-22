@@ -1,4 +1,4 @@
-import { API_URL, resolveImageUrl } from "@/lib/api";
+import { API_URL, fetchObjects, resolveImageUrl } from "@/lib/api";
 
 describe("resolveImageUrl", () => {
   it("returns an empty string for an empty input", () => {
@@ -24,5 +24,74 @@ describe("resolveImageUrl", () => {
     expect(resolveImageUrl("uploads/image.png")).toBe(
       `${API_URL}/uploads/image.png`
     );
+  });
+});
+
+describe("fetchObjects", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("requests /objects without query params when none are given", async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], total: 0, page: 1, limit: 12 }),
+    });
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    await fetchObjects();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${API_URL}/objects`,
+      expect.objectContaining({ cache: "no-store" })
+    );
+  });
+
+  it("appends page/limit as query params when given", async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], total: 0, page: 2, limit: 5 }),
+    });
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    await fetchObjects({ page: 2, limit: 5 });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${API_URL}/objects?page=2&limit=5`,
+      expect.objectContaining({ cache: "no-store" })
+    );
+  });
+
+  it("parses the paginated envelope and computes hasMore", async () => {
+    const items = [
+      {
+        _id: "1",
+        title: "A",
+        description: "d",
+        imageUrl: "/a.png",
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items, total: 10, page: 1, limit: 1 }),
+    }) as unknown as typeof fetch;
+
+    const result = await fetchObjects({ page: 1, limit: 1 });
+
+    expect(result).toEqual({ items, total: 10, page: 1, limit: 1, hasMore: true });
+  });
+
+  it("reports hasMore as false once every page has been fetched", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], total: 2, page: 2, limit: 1 }),
+    }) as unknown as typeof fetch;
+
+    const result = await fetchObjects({ page: 2, limit: 1 });
+
+    expect(result.hasMore).toBe(false);
   });
 });

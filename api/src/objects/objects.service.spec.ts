@@ -14,6 +14,7 @@ describe('ObjectsService', () => {
     find: jest.Mock;
     findById: jest.Mock;
     deleteOne: jest.Mock;
+    countDocuments: jest.Mock;
   };
   let s3Service: {
     uploadFile: jest.Mock;
@@ -31,6 +32,7 @@ describe('ObjectsService', () => {
       find: jest.fn(),
       findById: jest.fn(),
       deleteOne: jest.fn(),
+      countDocuments: jest.fn(),
     };
     s3Service = {
       uploadFile: jest.fn(),
@@ -56,6 +58,59 @@ describe('ObjectsService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('findAll', () => {
+    function mockFind(items: unknown[]) {
+      const sort = jest.fn().mockReturnThis();
+      const skip = jest.fn().mockReturnThis();
+      const limit = jest.fn().mockReturnThis();
+      const exec = jest.fn().mockResolvedValue(items);
+      model.find.mockReturnValue({ sort, skip, limit, exec });
+      return { sort, skip, limit, exec };
+    }
+
+    function mockCountDocuments(total: number) {
+      const exec = jest.fn().mockResolvedValue(total);
+      model.countDocuments.mockReturnValue({ exec });
+      return exec;
+    }
+
+    it('uses default pagination values (page 1, limit 12) when none are provided', async () => {
+      const items = [{ _id: '1' }, { _id: '2' }];
+      const { sort, skip, limit } = mockFind(items);
+      mockCountDocuments(2);
+
+      const result = await service.findAll({});
+
+      expect(sort).toHaveBeenCalledWith({ createdAt: -1 });
+      expect(skip).toHaveBeenCalledWith(0);
+      expect(limit).toHaveBeenCalledWith(12);
+      expect(result).toEqual({ items, total: 2, page: 1, limit: 12 });
+    });
+
+    it('applies a custom page/limit and computes the correct skip', async () => {
+      const items = [{ _id: '3' }];
+      const { skip, limit } = mockFind(items);
+      mockCountDocuments(25);
+
+      const result = await service.findAll({ page: 3, limit: 5 });
+
+      expect(skip).toHaveBeenCalledWith(10);
+      expect(limit).toHaveBeenCalledWith(5);
+      expect(result).toEqual({ items, total: 25, page: 3, limit: 5 });
+    });
+
+    it('returns total reflecting countDocuments regardless of page size', async () => {
+      const items = [{ _id: '1' }];
+      mockFind(items);
+      const countExec = mockCountDocuments(42);
+
+      const result = await service.findAll({ page: 1, limit: 1 });
+
+      expect(countExec).toHaveBeenCalled();
+      expect(result.total).toBe(42);
+    });
   });
 
   describe('findOne', () => {

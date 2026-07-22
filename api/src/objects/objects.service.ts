@@ -3,8 +3,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
 import { ObjectEntity, ObjectDocument } from './schemas/object.schema';
 import { CreateObjectDto } from './dto/create-object.dto';
+import { FindObjectsQueryDto } from './dto/find-objects-query.dto';
 import { S3Service } from '../storage/s3.service';
 import { EventsGateway } from '../events/events.gateway';
+
+export interface PaginatedObjects {
+  items: ObjectDocument[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 @Injectable()
 export class ObjectsService {
@@ -33,8 +41,22 @@ export class ObjectsService {
     return created;
   }
 
-  async findAll(): Promise<ObjectDocument[]> {
-    return this.objectModel.find().sort({ createdAt: -1 }).exec();
+  async findAll(query: FindObjectsQueryDto): Promise<PaginatedObjects> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 12;
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.objectModel
+        .find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.objectModel.countDocuments().exec(),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   async findOne(id: string): Promise<ObjectDocument> {
